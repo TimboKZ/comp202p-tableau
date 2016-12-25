@@ -6,7 +6,7 @@ char propositionLetters[4] = "pqr";
 size_t formulaSize = 600;
 int cases = 10;
 int topLevelBinary = 1;
-char binConn;
+char binConn = '\0';
 char binPart1[50];
 char binPart2[50];
 
@@ -55,6 +55,10 @@ int isProposition(char *formula) {
 char *subStr(char *string, int start, int end) {
     int length = end - start + 2;
     char *result = malloc(length * sizeof *result);
+    if (result == NULL) {
+        fprintf(stderr, "Failed to allocate memory for a new substring!");
+        exit(1);
+    }
     int k = 0, i;
     for (i = start; i < end + 1; i++) {
         result[k++] = string[i];
@@ -126,6 +130,10 @@ char *concat(char *string1, char *string2) {
     int length2 = strlen(string2);
     int length = length1 + length2 + 1;
     char *result = malloc((length) * sizeof *result);
+    if (result == NULL) {
+        fprintf(stderr, "Failed to allocate memory for a new string for concatenation!");
+        exit(1);
+    }
     int k = 0, i;
     for (i = 0; i < length1; i++) {
         result[k++] = string1[i];
@@ -160,13 +168,17 @@ typedef struct node node;
 /**
  * Contains the pointer to the last node in the queue
  */
-node *lastNode;
+node *lastNode = NULL;
 
 /**
  * Adds a new node to the queue and updates the global node reference
  */
 void addToQueue(tableau *t) {
     node *n = malloc(sizeof(node));
+    if (n == NULL) {
+        fprintf(stderr, "Failed to allocate memory for a new node in the queue!");
+        exit(1);
+    }
     n->currentTableau = t;
     n->next = NULL;
     lastNode->next = n;
@@ -178,6 +190,10 @@ void addToQueue(tableau *t) {
  */
 tableau *fToTableau(char *formula) {
     tableau *t = malloc(sizeof(tableau));
+    if (t == NULL) {
+        fprintf(stderr, "Failed to allocate memory for a new tableau struct!");
+        exit(1);
+    }
     t->formula = formula;
     t->middle = NULL;
     t->right = NULL;
@@ -330,8 +346,6 @@ void add2to2(tableau *root, char *leftFormula, char *rightFormula) {
  * produced in the process to the queue.
  */
 void completeTableau(tableau *currentTableau) {
-    fprintf(stdout, currentTableau->formula);
-    fprintf(stdout, "\n===\n");
     topLevelBinary = 1;
     int type = parse(currentTableau->formula);
     int length = strlen(currentTableau->formula);

@@ -63,81 +63,59 @@ char *subStr(char *string, int start, int end) {
     return result;
 }
 
-/* returns 0 for non-formulas, 1 for atoms, 2 for negations, 3 for binary connective fmlas,
- * 4 for existential and 5 for universal formulas.*/
+/**
+ * Returns 1 for propositions, 2 for negations, 3 for binary formulas and 0 otherwise
+ */
 int parse(char *string) {
     int length = strlen(string);
-
-    //printf("Recurs.: %s\n", string);
-
-    // Check that string is not empty
-    if (length == 0) return 0;
-
-    // Check that the amount of brackets is correct
-    int totalRoundBrackets = 0;
-    int openingBrackets = 0;
-    int closingBrackets = 0;
-    int i = 0;
-    for (i = 0; i < length; i++) {
-        char k = string[i];
-        if (k == '(' || k == '[') openingBrackets++;
-        if (k == ')' || k == ']') closingBrackets++;
-        if (k == '(' || k == ')') totalRoundBrackets++;
-    }
-    if (openingBrackets != closingBrackets) return 0;
 
     // Check if input is a proposition
     if (length == 1) {
         return isProposition(string);
     }
+
     // Check if input is a negation
     if (string[0] == '-') {
         if (length < 2) return 0;
-        char *strBit = subStr(string, 1, length - 1);
-        int result = parse(strBit);
-        free(strBit);
-        if (result != 0) return 2;
+        if (parse(string + 1) != 0) return 2;
     }
+
     // Check if input is a binary formula
     if (string[0] == '(' && string[length - 1] == ')') {
         if (length < 5) return 0;
-        char *strBit = subStr(string, 1, length - 2);
-        int bitLength = strlen(strBit);
+
+        // Extract the binary connective and its position
         int cursor = 0;
-        if (totalRoundBrackets - 2 != 0) {
-            int openBrackets = 0;
-            int closedBrackets = 0;
-            for (cursor = 0; cursor < bitLength; cursor++) {
-                char currChar = strBit[cursor];
-                if (currChar == '(') openBrackets++;
-                if (currChar == ')') closedBrackets++;
-                if ((currChar == '^' || currChar == 'v' || currChar == '>') && openBrackets == closedBrackets) break;
-            }
-        } else {
-            for (cursor = 0; cursor < bitLength; cursor++) {
-                char currChar = strBit[cursor];
-                if (currChar == '^' || currChar == 'v' || currChar == '>') break;
-            }
+        int openBrackets = 0;
+        int closedBrackets = 0;
+        for (cursor = 1; cursor < length - 2; cursor++) {
+            if (string[cursor] == '(') openBrackets++;
+            if (string[cursor] == ')') closedBrackets++;
+            if (charInStr(string[cursor], "^v>") && openBrackets == closedBrackets) break;
         }
-        char resultChar = strBit[cursor];
-        char arrayC[] = {resultChar, '\0'};
-        if (inStr(arrayC, "^v>") == 0) return 0;
-        char *part1 = subStr(strBit, 0, cursor - 1);
-        char *part2 = subStr(strBit, cursor + 1, bitLength - 1);
+        char resultChar = string[cursor];
+        if (charInStr(resultChar, "^v>") == 0) return 0;
+
+        // Extract the parts of binary formula around the connective
+        char *part1 = subStr(string, 1, cursor - 1);
+        char *part2 = subStr(string, cursor + 1, length - 2);
+
+        // Store results in global variables if necessary
         if (topLevelBinary != 0) {
             binConn = resultChar;
             strcpy(binPart1, part1);
             strcpy(binPart2, part2);
         }
         topLevelBinary = 0;
+
+        // Parse parts of the binary formula, free memory and return the result
         int result = parse(part1) * parse(part2);
         free(part1);
         free(part2);
-        free(strBit);
         if (result != 0) return 3;
     }
-    return 0;
 
+    return 0;
 }
 
 /**

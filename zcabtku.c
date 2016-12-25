@@ -312,8 +312,8 @@ void add2Children(tableau *root, tableau *left, tableau *right) {
     addToQueue(rightCopy);
 
     // Add new copies as children to the current (leaf) tableau
-    root->left = left;
-    root->right = right;
+    root->left = leftCopy;
+    root->right = rightCopy;
 }
 
 /**
@@ -352,8 +352,6 @@ void add2to2(tableau *root, char *leftFormula, char *rightFormula) {
  * produced in the process to the queue.
  */
 void completeTableau(tableau *currentTableau) {
-    printf(currentTableau->formula);
-    printf("\n");
     topLevelBinary = 1;
     int type = parse(currentTableau->formula);
     int length = strlen(currentTableau->formula);
@@ -432,7 +430,6 @@ void completeTableau(tableau *currentTableau) {
  * Dynamically creates a queue complete a tableau tree by iterating over nodes in said queue
  */
 void complete(tableau *root) {
-    printf(">>> Complete\n");
     // Declare the first node in the queue and set the global reference
     node *currentNode = malloc(sizeof(struct node));
     currentNode->currentTableau = root;
@@ -452,8 +449,6 @@ void complete(tableau *root) {
  * Recursively analyses a tableau, returns true as soon as an open branch is found, false if there are none
  */
 int openRecursion(tableau *currentTableau, char *propositions, char *negatedPropositions) {
-    printf(currentTableau->formula);
-    printf("\n");
     // Check if the current formula is a propositions or a negated proposition,
     // then update strings if necessary.
     // NOTE: Makes a copy of the string if changes are needed to avoid collision
@@ -490,7 +485,6 @@ int openRecursion(tableau *currentTableau, char *propositions, char *negatedProp
  * Analyses the tableau and returns false as soon as an open branch is found, true if there are none
  */
 int closed(tableau *root) {
-    printf(">>> Closed\n");
     // Create arrays for propositions and negated propositions
     char *propositions = malloc(4 * sizeof *propositions);
     propositions[0] = '\0';

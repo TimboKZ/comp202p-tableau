@@ -3,12 +3,25 @@
 #include <stdlib.h>     /* malloc, free, rand */
 
 char propositionLetters[4] = "pqr";
-int Fsize = 50;
-int cases = 6;
+size_t formulaSize = 50;
+int cases = 10;
 int topLevelBinary = 1;
 char binConn;
 char binPart1[50];
 char binPart2[50];
+
+/**
+ * Checks if the character can be found in `filter`
+ */
+int charInStr(char c, char *filter) {
+    int k = 0;
+    int match = 0;
+    while (filter[k] != '\0') {
+        if (c == filter[k]) match = 1;
+        k++;
+    }
+    return match;
+}
 
 /**
  * Checks if every character in `string` can be found in `filter`
@@ -16,13 +29,7 @@ char binPart2[50];
 int inStr(char *string, char *filter) {
     int i = 0;
     while (string[i] != '\0') {
-        int k = 0;
-        int match = 0;
-        while (filter[k] != '\0') {
-            if (string[i] == filter[k]) match = 1;
-            k++;
-        }
-        if (match == 0) return 0;
+        if (!charInStr(string[i], filter)) return 0;
         i++;
     }
     return 1;
@@ -31,12 +38,12 @@ int inStr(char *string, char *filter) {
 /**
  * Returns 1 for a proposition, 2 for a negated proposition and 0 otherwise
  */
-int isProposition(char* formula) {
+int isProposition(char *formula) {
     int length = strlen(formula);
-    if(length == 1) {
+    if (length == 1) {
         return inStr(formula, propositionLetters);
     }
-    if(length == 2 && formula[0] == '-'){
+    if (length == 2 && formula[0] == '-') {
         return inStr(formula + 1, propositionLetters) * 2;
     }
     return 0;
@@ -157,7 +164,6 @@ char *concat(char *string1, char *string2) {
  */
 struct tableau {
     char *formula;
-    struct tableau *parent;
     struct tableau *left;
     struct tableau *middle;
     struct tableau *right;
@@ -195,7 +201,6 @@ void addToQueue(tableau *t) {
 tableau *fToTableau(char *formula) {
     tableau *t = malloc(sizeof(tableau));
     t->formula = formula;
-    t->parent = NULL;
     t->middle = NULL;
     t->right = NULL;
     t->left = NULL;
@@ -203,9 +208,61 @@ tableau *fToTableau(char *formula) {
 }
 
 /**
+ * Creates a deep copy of the tableau, i.e. creates brand new copies of all objects referenced by
+ * the pointers stored inside of the tableau struct (except `parent`)
+ */
+tableau *deepCopyTableau(tableau *source) {
+    char *formula = concat("", source->formula);
+    tableau *new = fToTableau(formula);
+    if (source->left != NULL) {
+        new->left = deepCopyTableau(source->left);
+    }
+    if (source->middle != NULL) {
+        new->middle = deepCopyTableau(source->middle);
+    }
+    if (source->right != NULL) {
+        new->right = deepCopyTableau(source->right);
+    }
+    return new;
+}
+
+/**
+ * Recursively frees memory used by different elements of the tableau struct
+ */
+void freeTableau(tableau *currentTableau) {
+    // Do nothing if we were accidentally called on a null pointer
+    if (currentTableau == NULL) return;
+
+    if (currentTableau->left != NULL) {
+        freeTableau(currentTableau->left);
+        currentTableau->left = NULL;
+    }
+
+    if (currentTableau->middle != NULL) {
+        freeTableau(currentTableau->middle);
+        currentTableau->middle = NULL;
+    }
+
+    if (currentTableau->right != NULL) {
+        freeTableau(currentTableau->right);
+        currentTableau->right = NULL;
+    }
+
+    if (currentTableau->formula != NULL) {
+        currentTableau->formula = NULL;
+        free(currentTableau->formula);
+    }
+
+    // Kill ourselves
+    currentTableau = NULL;
+    free(currentTableau);
+}
+
+/**
  * Iterates through the node adding the middle (only) child to leaves
  */
 void add1Child(tableau *root, tableau *middle) {
+    // If current node is node a leaf, just carry on the recursion
     if (root->middle != NULL) {
         add1Child(root->middle, middle);
         return;
@@ -215,14 +272,26 @@ void add1Child(tableau *root, tableau *middle) {
         add1Child(root->right, middle);
         return;
     }
-    root->middle = middle;
-    middle->parent = root;
+
+    // We don't want different branches to share the same pointer, so we create
+    // a brand new copy which has nothing else referencing it
+    tableau *middleCopy = deepCopyTableau(middle);
+
+    // Add the new copy to the queue. If it had a middle child, add it to the queue also
+    addToQueue(middleCopy);
+    if (middleCopy->middle != NULL) {
+        addToQueue(middleCopy->middle);
+    }
+
+    // Add the new copy as a child to the current (leaf) tableau
+    root->middle = middleCopy;
 }
 
 /**
  * Iterates through nodes adding left and right children to leaves
  */
 void add2Children(tableau *root, tableau *left, tableau *right) {
+    // If current node is node a leaf, just carry on the recursion
     if (root->middle != NULL) {
         add2Children(root->middle, left, right);
         return;
@@ -232,38 +301,45 @@ void add2Children(tableau *root, tableau *left, tableau *right) {
         add2Children(root->right, left, right);
         return;
     }
+
+    // We don't want different branches to share the same pointers, so we create
+    // a brand new copy which has nothing else referencing it
+    tableau *leftCopy = deepCopyTableau(left);
+    tableau *rightCopy = deepCopyTableau(right);
+
+    // Add new copies to the queue
+    addToQueue(leftCopy);
+    addToQueue(rightCopy);
+
+    // Add new copies as children to the current (leaf) tableau
     root->left = left;
     root->right = right;
-    left->parent = root;
-    right->parent = root;
 }
 
 /**
  * Adds 1 tableau as a single branch
  */
-void add1to1(tableau* root, char *formula) {
+void add1to1(tableau *root, char *formula) {
     tableau *singleTableau = fToTableau(formula);
     add1Child(root, singleTableau);
-    addToQueue(singleTableau);
+    freeTableau(singleTableau);
 }
 
 /**
  * Adds two tableau as a single branch
  */
-void add2to1(tableau* root, char *topFormula, char *bottomFormula) {
+void add2to1(tableau *root, char *topFormula, char *bottomFormula) {
     tableau *top = fToTableau(topFormula);
     tableau *bottom = fToTableau(bottomFormula);
     top->middle = bottom;
-    bottom->parent = top;
     add1Child(root, top);
-    addToQueue(top);
-    addToQueue(bottom);
+    freeTableau(top);
 }
 
 /**
  * Adds two tableau as 2 branches
  */
-void add2to2(tableau* root, char *leftFormula, char *rightFormula) {
+void add2to2(tableau *root, char *leftFormula, char *rightFormula) {
     tableau *left = fToTableau(leftFormula);
     tableau *right = fToTableau(rightFormula);
     add2Children(root, left, right);
@@ -373,63 +449,71 @@ void complete(tableau *root) {
 }
 
 /**
- * Recursively analyses a tableau, returns false as soon as an open branch is found, true if there are none
+ * Recursively analyses a tableau, returns true as soon as an open branch is found, false if there are none
  */
-int closedRecursion(tableau *currentTableau, char* propositions, char* negatedPropositions) {
+int openRecursion(tableau *currentTableau, char *propositions, char *negatedPropositions) {
+    printf(currentTableau->formula);
+    printf("\n");
     // Check if the current formula is a propositions or a negated proposition,
     // then update strings if necessary.
     // NOTE: Makes a copy of the string if changes are needed to avoid collision
     int propositionType = isProposition(currentTableau->formula);
-
-    // Are we a leaf node?
-    if(propositionType
-       && currentTableau->middle == NULL
-       && currentTableau->left == NULL
-       && currentTableau->right == NULL) {
-        if(propositionType == 1 && !inStr(currentTableau->formula, negatedPropositions)) {
-            return 1;
-        }
-        if(propositionType == 2 && !inStr(currentTableau->formula, propositions)) {
-            return 1;
-        }
-        return 0;
-    }
-
-    if(propositionType == 1 && !inStr(currentTableau->formula, propositions)) {
+    if (propositionType == 1 && !inStr(currentTableau->formula, propositions)) {
         propositions = concat(currentTableau->formula, propositions);
-    } else if(propositionType == 2 && !inStr(currentTableau->formula + 1, negatedPropositions)) {
+    } else if (propositionType == 2 && !inStr(currentTableau->formula + 1, negatedPropositions)) {
         negatedPropositions = concat(currentTableau->formula + 1, negatedPropositions);
     }
 
     // Initiate recursion on children where necessary
-    if(currentTableau->middle != NULL) {
-        return closedRecursion(currentTableau->middle, propositions, negatedPropositions);
+    if (currentTableau->middle != NULL) {
+        return openRecursion(currentTableau->middle, propositions, negatedPropositions);
     }
-    if(currentTableau->left != NULL && currentTableau->right != NULL) {
-        if(closedRecursion(currentTableau->left, propositions, negatedPropositions) == 1) return 1;
-        if(closedRecursion(currentTableau->right, propositions, negatedPropositions) == 1) return 1;
+    if (currentTableau->left != NULL && currentTableau->right != NULL) {
+        if (openRecursion(currentTableau->left, propositions, negatedPropositions) == 1) return 1;
+        if (openRecursion(currentTableau->right, propositions, negatedPropositions) == 1) return 1;
         return 0;
     }
 
-    // We'd never reach this place unless the tree was malformed.
-    return 0;
+    // We are a leaf! :o
+    // Check if there any contradictions in char arrays
+    int i;
+    int len = strlen(propositions);
+    for (i = 0; i < len; i++) {
+        if (charInStr(propositions[i], negatedPropositions)) return 0;
+    }
+
+    // Woooo, we have an open branch!
+    return 1;
 };
 
 /**
  * Analyses the tableau and returns false as soon as an open branch is found, true if there are none
  */
 int closed(tableau *root) {
+    printf(">>> Closed\n");
+    // Create arrays for propositions and negated propositions
     char *propositions = malloc(4 * sizeof *propositions);
     propositions[0] = '\0';
     char *negatedPropositions = malloc(4 * sizeof *negatedPropositions);
     negatedPropositions[0] = '\0';
-    return closedRecursion(root, propositions, negatedPropositions);
+
+    // Initiate recursion for open branches
+    int closed = !openRecursion(root, propositions, negatedPropositions);
+
+    // Free arrays
+    propositions = NULL;
+    free(propositions);
+    negatedPropositions = NULL;
+    free(negatedPropositions);
+
+    // Return our result
+    return closed;
 }
 
 /*input a string and check if its a propositional formula */
 int main() {
 
-    char *name = malloc(Fsize);
+    char *name = malloc(formulaSize);
     FILE *fp, *fpout;
 
     /* reads from input.txt, writes to output.txt*/
@@ -464,13 +548,14 @@ int main() {
 
         /*make new tableau with name at root, no children, no parent*/
 
-        tableau t = {name, NULL, NULL, NULL, NULL};
+        tableau *root = fToTableau(name);
 
         /*expand the root, recursively complete the children*/
         if (parse(name) != 0) {
-            complete(&t);
-            if (closed(&t)) fprintf(fpout, "%s is not satisfiable.\n", name);
+            complete(root);
+            if (closed(root)) fprintf(fpout, "%s is not satisfiable.\n", name);
             else fprintf(fpout, "%s is satisfiable.\n", name);
+            freeTableau(root);
         } else fprintf(fpout, "I told you, %s is not a formula.\n", name);
     }
 

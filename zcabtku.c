@@ -3,7 +3,7 @@
 #include <stdlib.h>     /* malloc, free, rand */
 
 char propositionLetters[4] = "pqr";
-size_t formulaSize = 50;
+size_t formulaSize = 600;
 int cases = 10;
 int topLevelBinary = 1;
 char binConn;
@@ -321,8 +321,8 @@ void add2to2(tableau *root, char *leftFormula, char *rightFormula) {
     tableau *left = fToTableau(leftFormula);
     tableau *right = fToTableau(rightFormula);
     add2Children(root, left, right);
-    addToQueue(left);
-    addToQueue(right);
+    freeTableau(left);
+    freeTableau(right);
 }
 
 /**
@@ -330,6 +330,8 @@ void add2to2(tableau *root, char *leftFormula, char *rightFormula) {
  * produced in the process to the queue.
  */
 void completeTableau(tableau *currentTableau) {
+    fprintf(stdout, currentTableau->formula);
+    fprintf(stdout, "\n===\n");
     topLevelBinary = 1;
     int type = parse(currentTableau->formula);
     int length = strlen(currentTableau->formula);
